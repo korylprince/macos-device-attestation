@@ -21,12 +21,12 @@ func New(key []byte, iss string, aud []string, dur time.Duration) *TokenStore {
 	return &TokenStore{key: key, iss: iss, aud: aud, dur: dur}
 }
 
-// New generates a new token for the given serial
-func (t *TokenStore) New(serial string) (token string, err error) {
+// New generates a new token for identifier
+func (t *TokenStore) New(identifier string) (token string, err error) {
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Issuer:    t.iss,
 		Audience:  t.aud,
-		Subject:   serial,
+		Subject:   identifier,
 		IssuedAt:  &jwt.NumericDate{Time: time.Now()},
 		ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(t.dur)},
 	})
@@ -39,8 +39,8 @@ func (t *TokenStore) New(serial string) (token string, err error) {
 	return token, nil
 }
 
-// Authenticate authenticates the token and returns the associated serial number.
-func (t *TokenStore) Authenticate(token string) (serial string, err error) {
+// Authenticate authenticates the token and returns the associated identifier.
+func (t *TokenStore) Authenticate(token string) (identifier string, err error) {
 	claims := make(jwt.MapClaims)
 	_, err = jwt.ParseWithClaims(token, &claims, func(token *jwt.Token) (interface{}, error) {
 		// validate alg

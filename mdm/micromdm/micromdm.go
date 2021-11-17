@@ -3,15 +3,13 @@ package micromdm
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
 	lru "github.com/hashicorp/golang-lru"
 	macospkg "github.com/korylprince/go-macos-pkg"
+	attest "github.com/korylprince/macos-device-attestation"
 )
-
-var ErrNotFound = errors.New("device not found")
 
 // MDM implements the MDM interface. The interface has a configurable cache for serial-to-UDID lookups
 type MDM struct {
@@ -31,8 +29,8 @@ func New(prefix, token string, size int) (*MDM, error) {
 	return &MDM{URLPrefix: prefix, Token: token, cache: cache}, nil
 }
 
-// SerialToUDID returns the UDID for the given serial. If the serial is not found, the returned error will be ErrNotFound.
-func (m *MDM) SerialToUDID(serial string) (string, error) {
+// Transform returns the UDID for the given serial. If the serial is not found, attest.ErrInvalidIdentifier is returned
+func (m *MDM) Transform(serial string) (string, error) {
 	type response struct {
 		Devices []struct {
 			UDID string `json:"udid"`
@@ -76,7 +74,7 @@ func (m *MDM) SerialToUDID(serial string) (string, error) {
 	}
 
 	if len(resp.Devices) != 1 || resp.Devices[0].UDID == "" {
-		return "", ErrNotFound
+		return "", attest.ErrInvalidIdentifier
 	}
 
 	m.cache.Add(serial, resp.Devices[0].UDID)
@@ -84,15 +82,10 @@ func (m *MDM) SerialToUDID(serial string) (string, error) {
 	return resp.Devices[0].UDID, nil
 }
 
-// InstallEnterpriseApplication runs the InstallEnterpriseApplication command with the given serial and manifest
-func (m *MDM) InstallEnterpriseApplication(serial string, manifest *macospkg.Manifest) error {
+// InstallEnterpriseApplication runs the InstallEnterpriseApplication command with the given udid and manifest
+func (m *MDM) InstallEnterpriseApplication(udid string, manifest *macospkg.Manifest) error {
 	type response struct {
 		Error string `json:"error"`
-	}
-
-	udid, err := m.SerialToUDID(serial)
-	if err != nil {
-		return fmt.Errorf("could not get UDID: %w", err)
 	}
 
 	cmd := map[string]interface{}{

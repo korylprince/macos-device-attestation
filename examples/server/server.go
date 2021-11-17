@@ -22,8 +22,8 @@ import (
 var hmackey, _ = base64.StdEncoding.DecodeString("SSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSSDinaQgTWljcm9NRE0gSQ==")
 
 func replyHandler(w http.ResponseWriter, r *http.Request) {
-	serial := r.Context().Value(attest.ContextKeySerial)
-	j := map[string]string{"msg": fmt.Sprintf("Hello, %s!", serial)}
+	udid := r.Context().Value(attest.ContextKeyIdentifier)
+	j := map[string]string{"msg": fmt.Sprintf("Hello, %s!", udid)}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

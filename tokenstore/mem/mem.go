@@ -29,8 +29,8 @@ func New(size int, ttl time.Duration) *TokenStore {
 	return &TokenStore{tokens: c}
 }
 
-// New generates a new token for the given serial
-func (t *TokenStore) New(serial string) (token string, err error) {
+// New generates a new token identifier
+func (t *TokenStore) New(identifier string) (token string, err error) {
 	tok := make([]byte, tokenSize)
 	if _, err := rand.Read(tok); err != nil {
 		return "", fmt.Errorf("could not generate token: %w", err)
@@ -38,15 +38,15 @@ func (t *TokenStore) New(serial string) (token string, err error) {
 
 	token = base64.RawURLEncoding.EncodeToString(tok)
 
-	if err := t.tokens.Set(token, serial); err != nil {
+	if err := t.tokens.Set(token, identifier); err != nil {
 		return "", fmt.Errorf("could not set token: %w", err)
 	}
 	return token, nil
 }
 
-// Authenticate authenticates the token and returns the associated serial number
-func (t *TokenStore) Authenticate(token string) (serial string, err error) {
-	ser, err := t.tokens.Get(token)
+// Authenticate authenticates the token and returns the associated identifier
+func (t *TokenStore) Authenticate(token string) (identifier string, err error) {
+	id, err := t.tokens.Get(token)
 	if errors.Is(err, ttlcache.ErrNotFound) {
 		return "", &tokenstore.InvalidTokenError{Err: ttlcache.ErrNotFound}
 	}
@@ -54,5 +54,5 @@ func (t *TokenStore) Authenticate(token string) (serial string, err error) {
 		return "", fmt.Errorf("could not query cache: %w", err)
 	}
 
-	return ser.(string), nil
+	return id.(string), nil
 }

@@ -2,12 +2,12 @@ package tokenstore
 
 import "fmt"
 
-// TokenStore is an interface to generate and authenticate tokens associated with device serial numbers
+// TokenStore is an interface to generate and authenticate tokens associated with device identifiers
 type TokenStore interface {
-	// New generates a new token for the given serial
-	New(serial string) (token string, err error)
-	// Authenticate authenticates the token and returns the associated serial number. If token is invalid, err will be of type InvalidTokenError
-	Authenticate(token string) (serial string, err error)
+	// New generates a new token for identifier
+	New(identifier string) (token string, err error)
+	// Authenticate authenticates the token and returns the associated identifier. If token is invalid, err will be of type InvalidTokenError
+	Authenticate(token string) (identifier string, err error)
 }
 
 type InvalidTokenError struct {

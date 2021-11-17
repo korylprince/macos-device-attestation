@@ -2,13 +2,13 @@
 
 # About
 
-`macos-device-attestation` is a library to help build a macOS device attestation service. An on-device client can use this library to attest to a server using this library that it's running as root on the particular device (tied to a serial number).
+`macos-device-attestation` is a library to help build a macOS device attestation service. An on-device client can use this library to attest to a server using this library that it's running as root on the particular device.
 
 # How It Works
 
 At a high level, a server creates an `attest.AttestationService` and mounts it's `PlaceHandler` and `FileStoreHandler` at URLs accessible by the client. When a client requests attestation, the server uses a `transport.Transport` (see below) to securely place a token only readable by root on the client and tells the client where to read it from.
 
-The server can protect any other URLs with the `AttestationService`'s `Middleware` (or built-in `JSONMiddleware` helper). The client sends the token in the Authorization header, and the Middleware authenticates the token and places the serial number in the `http.Request`'s context (with key `attest.ContextKeySerial`).
+The server can protect any other URLs with the `AttestationService`'s `Middleware` (or built-in `JSONMiddleware` helper). The client sends the token in the Authorization header, and the Middleware authenticates the token and places the identifier in the `http.Request`'s context (with key `attest.ContextKeyIdentifier`).
 
 At a lower level, `attest.AttestationService` is backed by several interfaces:
 
@@ -19,6 +19,7 @@ At a lower level, `attest.AttestationService` is backed by several interfaces:
   * `mem.FileStore`: in-memory, bounded, auto-expiring cache storage of files
 * `transport.Transport`: places a secret on a device. Currently there is one implementation:
   * `mdm.Transport`: uses an `mdm.MDM` (see below) to place the secret on a device via an InstallEnterpriseApplication command
+  * A `transport.Transport` can optionally implement an `attest.Transformer` interface that transforms client identifiers to server identifiers. This is used by `mdm.Transport` to transform client-sent serial numbers to MDM server UDIDs
 
 `mdm.MDM` is itself an interface that currently has one implementation:
 * `micromdm.MDM`: uses MicroMDM's API
@@ -31,6 +32,10 @@ This library is meant to be extensible. Some examples of extending it:
 * Create a `filestore.FileStore` that can be shared by multiple servers
 
 PRs are welcome for implementations that are useful for a wide audience!
+
+# Security
+
+[macOS device serial numbers and UDIDs can be spoofed.](https://duo.com/labs/research/mdm-me-maybe) To use an MDM in the chain of trust, you must ensure only authenticated devices are allowed to enroll in your MDM server. Otherwise a bad actor could possibly spoof the serial number and UDID of another device to obtain a token for it.
 
 # Usage
 

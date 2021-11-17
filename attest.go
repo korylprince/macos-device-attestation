@@ -21,13 +21,22 @@ const pathSize = 16
 
 type ContextKey int
 
-// ContextKeySerial is used to retrieve the serial from an http.Request's context
-const ContextKeySerial ContextKey = iota
+// ContextKeyIdentifier is used to retrieve the identifier from an http.Request's context
+const ContextKeyIdentifier ContextKey = iota
 
 // StatusCodeSkip is returned by a ReturnHandlerFunc to indicate the ResponseWriter should not be written to
 const StatusCodeSkip int = -1
 
-// AttestationService is an HTTP service to allow a macOS client to attest that it has root access on a device with a particular serial number
+// ErErrInvalidIdentifier is returned by a Transformer if the client identifier is invalid
+var ErrInvalidIdentifier = errors.New("invalid identifier")
+
+// Transformer is an optional interface that a Transport can implement to transform a client-given identifier to a server-provided one. The mdm Transport uses this to transform serial numbers given by the client to MDM UDIDs
+type Transformer interface {
+	// Transform transforms identifier into another one. If the identifier is invalid, ErrInvalidIdentifier is returned
+	Transform(identifier string) (string, error)
+}
+
+// AttestationService is an HTTP service to allow a macOS client to attest that it has root access on a device with a particular identifier
 type AttestationService struct {
 	tokenstore.TokenStore
 	transport.Transport
@@ -45,7 +54,7 @@ type ReturnHandlerFunc func(w http.ResponseWriter, r *http.Request) (int, interf
 
 func (s *AttestationService) placeReturnHandlerFunc(w http.ResponseWriter, r *http.Request) (int, interface{}) {
 	type request struct {
-		Serial string `json:"serial"`
+		Identifier string `json:"identifier"`
 	}
 
 	type response struct {
@@ -57,11 +66,25 @@ func (s *AttestationService) placeReturnHandlerFunc(w http.ResponseWriter, r *ht
 		return http.StatusBadRequest, fmt.Errorf("attest place: could not parse request: %w", err)
 	}
 
-	if req.Serial == "" {
-		return http.StatusBadRequest, errors.New("attest place: empty serial")
+	if req.Identifier == "" {
+		return http.StatusBadRequest, errors.New("attest place: empty identifier")
 	}
 
-	token, err := s.TokenStore.New(req.Serial)
+	identifier := req.Identifier
+
+	if trans, ok := s.Transport.(Transformer); ok {
+		i, err := trans.Transform(identifier)
+		if err != nil {
+			e := fmt.Errorf("attest place: could not transform identifier: %w", err)
+			if errors.Is(err, ErrInvalidIdentifier) {
+				return http.StatusBadRequest, e
+			}
+			return http.StatusInternalServerError, e
+		}
+		identifier = i
+	}
+
+	token, err := s.TokenStore.New(identifier)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("attest place: could not create token: %w", err)
 	}
@@ -73,7 +96,7 @@ func (s *AttestationService) placeReturnHandlerFunc(w http.ResponseWriter, r *ht
 
 	path := fmt.Sprintf("/tmp/%s", base64.RawURLEncoding.EncodeToString(p))
 
-	if err := s.Transport.Place(token, req.Serial, path); err != nil {
+	if err := s.Transport.Place(token, identifier, path); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("attest place: could not place token: %w", err)
 	}
 
@@ -118,7 +141,7 @@ func (s *AttestationService) FileStoreHandler() http.Handler {
 	})
 }
 
-// Middleware is a middleware that checks that a valid attestation token has been sent in the Authorization header, and sets the corresponding serial in the request's context. Middleware returns a ReturnHandlerFunc and is intended to be wrapped by an http.Handler that will handle the returned status code and error. See ReturnHandlerFunc for more information. JSONMiddleware is a pre-built handler that marshals the code and error as JSON.
+// Middleware is a middleware that checks that a valid attestation token has been sent in the Authorization header, and sets the corresponding identifier in the request's context. Middleware returns a ReturnHandlerFunc and is intended to be wrapped by an http.Handler that will handle the returned status code and error. See ReturnHandlerFunc for more information. JSONMiddleware is a pre-built handler that marshals the code and error as JSON.
 func (s *AttestationService) Middleware(next http.Handler) ReturnHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) (int, interface{}) {
 		header := strings.Split(r.Header.Get("Authorization"), " ")
@@ -127,12 +150,12 @@ func (s *AttestationService) Middleware(next http.Handler) ReturnHandlerFunc {
 			return http.StatusBadRequest, errors.New("attest middleware: invalid header")
 		}
 		token := header[1]
-		serial, err := s.TokenStore.Authenticate(token)
+		identifier, err := s.TokenStore.Authenticate(token)
 		if err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("attest middleware: could not get serial: %w", err)
+			return http.StatusInternalServerError, fmt.Errorf("attest middleware: could not get identifier: %w", err)
 		}
 
-		ctx := context.WithValue(r.Context(), ContextKeySerial, serial)
+		ctx := context.WithValue(r.Context(), ContextKeyIdentifier, identifier)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 		return StatusCodeSkip, nil

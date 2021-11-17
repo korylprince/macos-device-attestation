@@ -16,7 +16,7 @@ import (
 // GetToken retrieves a token from the device attestation service. GetToken will retry with exponential backoff until timeout
 func GetToken(url string, timeout time.Duration) (string, error) {
 	type request struct {
-		Serial string `json:"serial"`
+		Identifier string `json:"identifier"`
 	}
 
 	type response struct {
@@ -31,7 +31,7 @@ func GetToken(url string, timeout time.Duration) (string, error) {
 		return "", fmt.Errorf("could not get serial: %w", errors.New("serial is empty"))
 	}
 
-	req, err := json.Marshal(&request{Serial: serial})
+	req, err := json.Marshal(&request{Identifier: serial})
 	if err != nil {
 		return "", fmt.Errorf("could not marshal request: %w", err)
 	}
