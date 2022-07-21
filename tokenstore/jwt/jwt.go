@@ -16,7 +16,7 @@ type TokenStore struct {
 	dur time.Duration
 }
 
-// New returns a new JWT TokenStore. key should be 256 bits. If iss and aud are set, they be put in the token and verified by Authenticate. dur is used to set the iss and exp claims
+// New returns a new JWT TokenStore. key should be 256 bits. If iss and aud are set, they will be put in the token and verified by Authenticate. dur is used to set the iat, nbf, and exp claims
 func New(key []byte, iss string, aud []string, dur time.Duration) *TokenStore {
 	return &TokenStore{key: key, iss: iss, aud: aud, dur: dur}
 }
@@ -28,6 +28,7 @@ func (t *TokenStore) New(identifier string) (token string, err error) {
 		Audience:  t.aud,
 		Subject:   identifier,
 		IssuedAt:  &jwt.NumericDate{Time: time.Now()},
+		NotBefore: &jwt.NumericDate{Time: time.Now().Add(-time.Second * 15)}, // allow small time drift
 		ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(t.dur)},
 	})
 
